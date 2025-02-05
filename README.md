@@ -151,7 +151,170 @@ exports.login = (req, res, next) => {
 ```
 when update code in Github
 ```bash
-git add.
+git add .
 git commit -m "message"
 git push
+```
+
+## Step 8 Validate with Zod
+/midlewares/validators.js
+
+```js
+const { z } = require("zod");
+
+//npm i zod
+// TEST validator
+exports.registerSchema = z.object({
+    email: z.string().email("Wrong Email "),
+    firstname: z.string().min(3, "Firstname must be longer than 3 letters"),
+    lastname: z.string().min(3, "Lastname must be longer than 3 letters"),
+    password: z.string().min(6, "Password must be longer than 6 letters"),
+    confirmPassword: z.string().min(6, "confirmPassword must be longer than 6 letters")
+}).refine((data) => data.password === data.confirmPassword, {
+    message: "Password is not match",
+    path: ["confirmPassword"]
+})
+
+
+exports.loginSchema = z.object({
+    email: z.string().email("Wrong Email "),
+    password: z.string().min(6, "Password must be longer than 6 letters"),
+})
+
+
+exports.validateWithZod = (schema) => (req, res, next) => {
+    try {
+        console.log("Hello Middleware");
+        schema.parse(req.body)
+        next();
+    } catch (error) {
+        const errMsg = error.errors.map((item) => item.message)
+        const errTxt = errMsg.join(",")
+        const mergeError = new Error(errTxt)
+        next(mergeError)
+    }
+}
+
+```
+and update code
+/route/auth-route.js
+
+```js
+const express = require("express");
+const router = express.Router()
+const authControllers = require("../controllers/auth-controller");
+const { validateWithZod, registerSchema, loginSchema } = require("../middlewares/validators");
+
+
+
+//@Endpoint http://localhost:8000/api/register
+router.post('/register', validateWithZod(registerSchema), authControllers.register);
+router.post("/login", validateWithZod(loginSchema), authControllers.login);
+
+
+
+// export
+module.exports = router
+
+```
+
+## Step 9 Prisma
+```bash
+npx prisma db push
+#Or
+npx prisma migrate dev --name init
+```
+
+### config prisma
+/configs/prisma.js
+```js
+const{PrismaClient} =require('@prisma/client')
+
+const prisma = new PrismaClient()
+
+module.exports = prisma;
+```
+
+update code
+Register
+/controller/auth-controller.js
+
+```js
+const prisma = require("../configs/prisma");
+const createError = require("../utils/createError");
+const bcrypt = require("bcryptjs")
+
+exports.register = async (req, res, next) => {
+
+    try {
+        //code
+        // Step 1 req.body
+
+        const { email, firstname, lastname, password, confirmPassword } = req.body;
+
+        // console.log(email,firstname,lastname,password,confirmPassword)
+        // Step 2 validate
+
+        // if(!email){
+        //     return createError(400,"Email is require!!!")
+        // }
+
+        // if(!firstname){
+        //     return createError(400,"Firstname is required!!!")
+        // }
+
+        // if(!lastname){
+        //     return res.status(400).json({message:"lastname is required"})
+
+        // }
+        // Step 3 Check already
+        const checkEmail = await prisma.profile.findFirst({
+            where: {
+                email: email,
+            }
+
+
+        })
+        console.log(checkEmail);
+        if (checkEmail) {
+            return createError(400, "Email is already exist")
+        }
+
+        // Step 4 Encrypt bcrypt
+        const salt = bcrypt.genSaltSync(10)
+        const hashedPassword = bcrypt.hashSync(password, 10)
+        // console.log(hashedPassword);
+
+        // Step 5 Insert to DB
+        const profile = await prisma.profile.create({
+            data: {
+                email: email,
+                firstname: firstname,
+                lastname: lastname,
+                password: hashedPassword,
+            }
+        })
+        // Step 6 Response
+
+        res.json({ message: "register complete" })
+    } catch (error) {
+        console.log("Step 2 Catch")
+        next(error)
+    }
+}
+
+exports.login = (req, res, next) => {
+    //code
+    try {
+        console.log(ddddd);
+
+        res.json({ message: "Hello Login" })
+    } catch (error) {
+        // console.log(error.message);
+        // res.status(500).json({ message: "Server Error!!!" })
+        next(error);
+
+    }
+
+}
 ```
