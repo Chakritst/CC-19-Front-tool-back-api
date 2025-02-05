@@ -318,3 +318,60 @@ exports.login = (req, res, next) => {
 
 }
 ```
+
+## Step 10 Login
+/controllers/auth-controller.js
+```js
+
+exports.login = async (req, res, next) => {
+    //code
+    try {
+        // Step 1 req.body
+        console.log(req.body);
+        const { email, password } = req.body
+
+        // Step 2 check email and password
+        const profile = await prisma.profile.findFirst({
+            where: {
+                email: email,
+            }
+        })
+        if (!profile) {
+            return createError(400, "Email, Password is invalid!!")
+        }
+        const isMatch = bcrypt.compareSync(password, profile.password)
+
+        if (!isMatch) {
+            return createError(400, "Email, Password is invalid!!")
+        }
+
+
+        // Step 3 Generate token
+        const payload = {
+            id: profile.id,
+            email: profile.email,
+            firstname: profile.firstname,
+            lastname: profile.lastname,
+            role: profile.role,
+        }
+        const token = jwt.sign(payload, process.env.SECRET, {
+            expiresIn: "1d"
+        })
+        console.log(token)
+        // Step 4 Response
+
+        res.json({
+            message: "Login Success!!!",
+            payload: payload,
+            token: token,
+        })
+    } catch (error) {
+        // console.log(error.message);
+        // res.status(500).json({ message: "Server Error!!!" })
+        next(error);
+
+    }
+
+}
+
+```
